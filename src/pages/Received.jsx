@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Plus, Download, ArrowDownLeft, Search } from "lucide-react";
 import { format } from "date-fns";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import ClientLedgerDialog from "@/components/shared/ClientLedgerDialog";
+import ClientCombobox from "@/components/shared/ClientCombobox";
 import {
   Select,
   SelectContent,
@@ -17,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
 import {
   Dialog,
   DialogContent,
@@ -41,9 +44,19 @@ export default function Received({ user }) {
   });
 
   const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [selectedClient, setSelectedClient] = useState(null);
 
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "admin";
+
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients", user?.id, user?.role],
+    queryFn: () =>
+      isAdmin
+        ? base44.entities.Client.list()
+        : base44.entities.Client.filter({ staff_id: user.id }),
+    enabled: !!user,
+  });
 
   const { data: received = [], isLoading } = useQuery({
     queryKey: ["collections"],
@@ -91,7 +104,10 @@ export default function Received({ user }) {
     if (isAdmin && !selectedStaffId) return;
 
     const staff = isAdmin
-      ? { id: selectedStaffId, full_name: staffList.find((s) => s.id === selectedStaffId)?.full_name }
+      ? {
+          id: selectedStaffId,
+          full_name: staffList.find((s) => s.id === selectedStaffId)?.full_name,
+        }
       : { id: user.id, full_name: user.full_name };
 
     setSaving(true);
@@ -212,7 +228,10 @@ export default function Received({ user }) {
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-sm">
+                      <h3
+                        className="font-semibold text-sm cursor-pointer hover:underline text-primary"
+                        onClick={() => setSelectedClient(r.source)}
+                      >
                         {r.source || "Unknown"}
                       </h3>
                       <Badge
@@ -241,6 +260,12 @@ export default function Received({ user }) {
         </div>
       )}
 
+      <ClientLedgerDialog
+        clientName={selectedClient}
+        isOpen={!!selectedClient}
+        onClose={() => setSelectedClient(null)}
+      />
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -251,13 +276,13 @@ export default function Received({ user }) {
           <div className="space-y-4 pt-2">
             <div>
               <Label>Received From</Label>
-              <Input
-                value={form.source}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, source: e.target.value }))
-                }
-                placeholder="Client / Person name"
-              />
+              <div className="w-full">
+                <ClientCombobox
+                  clients={clients}
+                  value={form.source}
+                  onChange={(v) => setForm((f) => ({ ...f, source: v }))}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

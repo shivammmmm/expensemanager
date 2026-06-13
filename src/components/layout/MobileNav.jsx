@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, ArrowDownLeft, ArrowUpRight, Receipt, FileText } from "lucide-react";
+import { LayoutDashboard, ArrowDownLeft, ArrowUpRight, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const adminLinks = [

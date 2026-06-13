@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Plus, Download, ArrowUpRight, Search } from "lucide-react";
 import { format } from "date-fns";
@@ -9,6 +9,8 @@ import { formatCurrency, exportToCSV } from "@/lib/exportUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import ClientLedgerDialog from "@/components/shared/ClientLedgerDialog";
+import ClientCombobox from "@/components/shared/ClientCombobox";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +41,7 @@ export default function Sent({ user }) {
   const isAdmin = user?.role === "admin";
 
   const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [selectedClient, setSelectedClient] = useState(null);
 
   const { data: staffList = [] } = useQuery({
     queryKey: ["staff"],
@@ -46,8 +49,18 @@ export default function Sent({ user }) {
     enabled: isAdmin,
   });
 
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients", user?.id, user?.role],
+    queryFn: () =>
+      isAdmin
+        ? base44.entities.Client.list()
+        : base44.entities.Client.filter({ staff_id: user.id }),
+    enabled: !!user,
+  });
+
   const { data: received = [] } = useQuery({
     queryKey: ["collections"],
+
     queryFn: () =>
       isAdmin
         ? base44.entities.Collection.list("-date", 500)
@@ -128,6 +141,7 @@ export default function Sent({ user }) {
     setSelectedStaffId("");
 
     queryClient.invalidateQueries({ queryKey: ["sent-payments"] });
+    queryClient.invalidateQueries({ queryKey: ["clients"] });
   };
 
   const handleExport = () => {
@@ -231,7 +245,10 @@ export default function Sent({ user }) {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm">
+                    <h3
+                      className="font-semibold text-sm cursor-pointer hover:underline text-primary"
+                      onClick={() => setSelectedClient(s.sent_to)}
+                    >
                       {s.sent_to || "Unknown"}
                     </h3>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
@@ -254,6 +271,12 @@ export default function Sent({ user }) {
         </div>
       )}
 
+      <ClientLedgerDialog
+        clientName={selectedClient}
+        isOpen={!!selectedClient}
+        onClose={() => setSelectedClient(null)}
+      />
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -262,13 +285,14 @@ export default function Sent({ user }) {
           <div className="space-y-4 pt-2">
             <div>
               <Label>Sent To</Label>
-              <Input
+              <ClientCombobox
+                clients={clients}
                 value={form.sent_to}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, sent_to: e.target.value }))
-                }
-                placeholder="Shopkeeper / Entity name"
+                onChange={(v) => setForm((f) => ({ ...f, sent_to: v }))}
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Tip: type a name and select from suggestions.
+              </p>
             </div>
             <div>
               <Label>Amount *</Label>

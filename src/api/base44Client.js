@@ -11,11 +11,12 @@ import {
   clearLocalToken,
 } from "@/lib/localToken";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE || "http://localhost:4000/api";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000/api";
 
-
-async function api(path, { method = "GET", body = undefined, token = undefined, headers = {} } = {}) {
+async function api(
+  path,
+  { method = "GET", body = undefined, token = undefined, headers = {} } = {}
+) {
   const reqHeaders = {
     "Content-Type": "application/json",
     ...headers,
@@ -62,15 +63,14 @@ function buildAuth() {
       return { access_token };
     },
 
-
-
-
     async register() {
       throw new Error("Registration disabled. Admin creates staff accounts.");
     },
 
     async verifyOtp() {
-      throw new Error("OTP verification disabled. Admin creates staff accounts.");
+      throw new Error(
+        "OTP verification disabled. Admin creates staff accounts."
+      );
     },
 
     async resendOtp() {
@@ -173,14 +173,27 @@ function buildEntities() {
     list: () => api("/users"),
   };
 
-  return { Expense, SentPayment, Collection, User };
+  const Client = {
+    list: (orderBy = undefined, _limit = undefined) => {
+      const order = orderBy ? String(orderBy) : undefined;
+      return api(`/clients?orderBy=${encodeURIComponent(order || "")}`);
+    },
+    filter: (_filterObj, orderBy = undefined, _limit = undefined) => {
+      // Server already enforces role/staff-based filtering.
+      const order = orderBy ? String(orderBy) : undefined;
+      return api(`/clients?orderBy=${encodeURIComponent(order || "")}`);
+    },
+  };
+
+  return { Expense, SentPayment, Collection, User, Client };
 }
 
 const base44 = {
   auth: buildAuth(),
   entities: buildEntities(),
   users: {
-    createStaff: (payload) => api("/users/create", { method: "POST", body: payload }),
+    createStaff: (payload) =>
+      api("/users/create", { method: "POST", body: payload }),
   },
 
   integrations: {

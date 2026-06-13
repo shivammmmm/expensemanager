@@ -271,6 +271,20 @@ app.post("/api/collections", authRequired, async (req, res) => {
 
   const body = req.body || {};
 
+  if (body.source) {
+    const existingClient = await Models.Client.findOne({ name: { $regex: new RegExp(`^${body.source}$`, "i") } }).lean();
+    if (!existingClient) {
+      const trimmedName = String(body.source).trim();
+      await Models.Client.create({
+        id: uuidv4(),
+        name: trimmedName,
+        staff_id: u.id,
+        staff_name: u.full_name,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
   const item = {
     id: uuidv4(),
     source: body.source || "",
@@ -397,6 +411,20 @@ app.post("/api/sent-payments", authRequired, async (req, res) => {
 
   const body = req.body || {};
 
+  if (body.sent_to) {
+    const existingClient = await Models.Client.findOne({ name: { $regex: new RegExp(`^${body.sent_to}$`, "i") } }).lean();
+    if (!existingClient) {
+      const trimmedName = String(body.sent_to).trim();
+      await Models.Client.create({
+        id: uuidv4(),
+        name: trimmedName,
+        staff_id: u.id,
+        staff_name: u.full_name,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
   const item = {
     id: uuidv4(),
     sent_to: body.sent_to || "",
@@ -410,6 +438,27 @@ app.post("/api/sent-payments", authRequired, async (req, res) => {
   await Models.SentPayment.create(item);
 
   return res.json(item);
+});
+
+// ---- Clients ----
+app.get("/api/clients", authRequired, async (req, res) => {
+  const currentUser = await Models.User.findOne({
+    id: req.auth.userId,
+  }).lean();
+
+  let items =
+    currentUser?.role === "admin"
+      ? await Models.Client.find().lean()
+      : await Models.Client.find({
+          staff_id: currentUser?.id,
+        }).lean();
+
+  const orderBy = req.query.orderBy;
+  const parsed = parseOrderParam(orderBy);
+  if (parsed) {
+    items = sortByFieldForArray(items, parsed);
+  }
+  return res.json(items);
 });
 
 // ---- Upload file stub ----
