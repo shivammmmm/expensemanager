@@ -118,7 +118,44 @@ export const Schemas = {
     },
     { timestamps: false }
   ),
+
+  cashLedger: new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true, index: true },
+      amount: { type: Number, default: 0 },
+      remark: { type: String, default: "" },
+      entry_date: { type: String, default: () => new Date().toISOString().slice(0, 10) },
+      created_by: { type: String, default: "" },
+      created_at: { type: String, default: () => new Date().toISOString() },
+    },
+    { timestamps: false }
+  ),
+
+  staffTransfer: new mongoose.Schema(
+    {
+      id: { type: String, required: true, unique: true, index: true },
+      staff_id: { type: String, default: "" },
+      staff_name: { type: String, default: "" },
+      amount: { type: Number, default: 0 },
+      remark: { type: String, default: "" },
+      transfer_date: { type: String, default: () => new Date().toISOString().slice(0, 10) },
+      created_by: { type: String, default: "" },
+      created_at: { type: String, default: () => new Date().toISOString() },
+    },
+    { timestamps: false }
+  ),
 };
+
+// Admin settings (single document)
+Schemas.settings = new mongoose.Schema(
+  {
+    company_name: { type: String, default: "" },
+    company_phone: { type: String, default: "" },
+    company_address: { type: String, default: "" },
+    updatedAt: { type: String, default: () => new Date().toISOString() },
+  },
+  { timestamps: false }
+);
 
 export const Models = {
   User: mongoose.models.User || mongoose.model("User", Schemas.user),
@@ -131,7 +168,16 @@ export const Models = {
     mongoose.models.SentPayment ||
     mongoose.model("SentPayment", Schemas.sentPayment),
   Client: mongoose.models.Client || mongoose.model("Client", Schemas.client),
+  CashLedger:
+    mongoose.models.CashLedger ||
+    mongoose.model("CashLedger", Schemas.cashLedger),
+  StaffTransfer:
+    mongoose.models.StaffTransfer ||
+    mongoose.model("StaffTransfer", Schemas.staffTransfer),
+  Settings:
+    mongoose.models.Settings || mongoose.model("Settings", Schemas.settings),
 };
+
 
 export async function seedAdmin() {
   if (!MONGO_URI) return;

@@ -1,8 +1,19 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Users, UserPlus, Phone, MapPin, Wallet, Receipt } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  Phone,
+  MapPin,
+  Wallet,
+  Receipt,
+  Pencil,
+  KeyRound,
+  Trash2,
+} from "lucide-react";
+
 
 import PageHeader from "@/components/shared/PageHeader";
 import EmptyState from "@/components/shared/EmptyState";
@@ -23,23 +34,17 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Staff() {
   const { toast } = useToast();
-  const { data: staffList = [], isLoading } = useQuery({
+
+  const { data: staffList = [], isLoading, refetch } = useQuery({
     queryKey: ["staff"],
     queryFn: () => base44.entities.User.list(),
   });
 
-  const { data: collections = [] } = useQuery({
-    queryKey: ["all-collections"],
-    queryFn: () => base44.entities.Collection.list("-collection_date", 1000),
-  });
-
-  const { data: expenses = [] } = useQuery({
-    queryKey: ["all-expenses"],
-    queryFn: () => base44.entities.Expense.list("-expense_date", 1000),
-  });
+  const isAdminView = true; // this route is admin-only via App.jsx
 
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -72,10 +77,149 @@ export default function Staff() {
         phone: "",
         designation: "",
       });
-
+      await refetch();
     } finally {
       setSaving(false);
     }
+  };
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState(null);
+  const editingStaff = useMemo(
+    () => staffList.find((s) => s.id === editingStaffId) || null,
+    [staffList, editingStaffId]
+  );
+
+  const [editForm, setEditForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    designation: "",
+    area: "",
+  });
+
+  const openEdit = (s) => {
+    setEditingStaffId(s.id);
+    setEditForm({
+      full_name: s.full_name || "",
+      email: s.email || "",
+      phone: s.phone || "",
+      designation: s.designation || "",
+      area: s.area || "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingStaffId) return;
+    setEditSaving(true);
+    try {
+      await base44.users.updateStaff(editingStaffId, editForm);
+      toast({ title: "Staff updated" });
+      setEditOpen(false);
+      setEditingStaffId(null);
+      await refetch();
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetStaffId, setResetStaffId] = useState(null);
+  const [resetPassword, setResetPassword] = useState("");
+
+  const openReset = (s) => {
+    setResetStaffId(s.id);
+    setResetPassword("");
+    setResetOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetStaffId || !resetPassword) return;
+    setResetSaving(true);
+    try {
+      await base44.users.resetStaffPassword(resetStaffId, {
+        password: resetPassword,
+      });
+      toast({ title: "Password updated" });
+      setResetOpen(false);
+      setResetStaffId(null);
+      await refetch();
+    } finally {
+      setResetSaving(false);
+    }
+  };
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteStaffId, setDeleteStaffId] = useState(null);
+
+  const openDelete = (s) => {
+    setDeleteStaffId(s.id);
+    setDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteStaffId) return;
+    setDeleteSaving(true);
+    try {
+      await base44.users.deleteStaff(deleteStaffId);
+      toast({ title: "Staff deleted" });
+      setDeleteOpen(false);
+      setDeleteStaffId(null);
+      await refetch();
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
+
+  const { data: collections = [] } = useQuery({
+    queryKey: ["all-collections"],
+    queryFn: () => base44.entities.Collection.list("-collection_date", 1000),
+  });
+
+  const { data: expenses = [] } = useQuery({
+    queryKey: ["all-expenses"],
+    queryFn: () => base44.entities.Expense.list("-expense_date", 1000),
+  });
+
+
+  const staffTableActions = (s) => {
+    const isAdminTarget = s?.role === "admin";
+
+    return (
+      <div className="flex gap-2 pt-3">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={isAdminTarget || !isAdminView}
+          onClick={() => openEdit(s)}
+        >
+          <Pencil className="w-4 h-4 mr-1" />
+          Edit
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={isAdminTarget || !isAdminView}
+          onClick={() => openReset(s)}
+        >
+          <KeyRound className="w-4 h-4 mr-1" />
+          Reset Password
+        </Button>
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={isAdminTarget || !isAdminView}
+          onClick={() => openDelete(s)}
+        >
+          <Trash2 className="w-4 h-4 mr-1" />
+          Delete
+        </Button>
+      </div>
+    );
   };
 
   return (
@@ -86,6 +230,7 @@ export default function Staff() {
           Create Staff
         </Button>
       </PageHeader>
+
 
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -175,6 +320,8 @@ export default function Staff() {
                       </p>
                     </div>
                   </div>
+
+                  <div>{staffTableActions(s)}</div>
                 </CardContent>
               </Card>
             );
@@ -261,6 +408,160 @@ export default function Staff() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Staff */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-heading">Edit Staff</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Full name</Label>
+              <Input
+                value={editForm.full_name}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, full_name: e.target.value }))
+                }
+                placeholder="Staff name"
+              />
+            </div>
+
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, email: e.target.value }))
+                }
+                placeholder="staff@example.com"
+              />
+            </div>
+
+            <div>
+              <Label>Phone</Label>
+              <Input
+                value={editForm.phone}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, phone: e.target.value }))
+                }
+                placeholder="9876543210"
+              />
+            </div>
+
+            <div>
+              <Label>Designation</Label>
+              <Input
+                value={editForm.designation}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, designation: e.target.value }))
+                }
+                placeholder="Accountant"
+              />
+            </div>
+
+            <div>
+              <Label>Area</Label>
+              <Input
+                value={editForm.area}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, area: e.target.value }))
+                }
+                placeholder="Area"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditSave} disabled={editSaving}>
+                {editSaving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password */}
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-heading">Reset Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="text-sm text-muted-foreground">
+              Set a new password for this staff.
+            </div>
+
+            <div>
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div>
+              <Label>Confirm Password</Label>
+              <Input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setResetOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleResetPassword}
+                disabled={resetSaving || !resetPassword}
+              >
+                {resetSaving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-heading">Delete Staff</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="text-sm text-muted-foreground">
+              This action cannot be undone.
+            </div>
+            <div className="font-medium">
+              {staffList.find((s) => s.id === deleteStaffId)?.full_name ||
+                "This staff member"}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleteSaving}
+              >
+                {deleteSaving ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
+

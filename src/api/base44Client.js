@@ -185,21 +185,59 @@ function buildEntities() {
     },
   };
 
-  return { Expense, SentPayment, Collection, User, Client };
+  const CashLedger = {
+    list: (orderBy = undefined, _limit = undefined) => {
+      const order = orderBy ? String(orderBy) : undefined;
+      return api(`/cash-ledger?orderBy=${encodeURIComponent(order || "")}`);
+    },
+    filter: (_filterObj, orderBy = undefined, _limit = undefined) => {
+      const order = orderBy ? String(orderBy) : undefined;
+      return api(`/cash-ledger?orderBy=${encodeURIComponent(order || "")}`);
+    },
+    create: (data) => api("/cash-ledger", { method: "POST", body: data }),
+  };
+
+  const StaffTransfer = {
+    list: (orderBy = undefined, _limit = undefined) => {
+      const order = orderBy ? String(orderBy) : undefined;
+      return api(`/staff-transfers?orderBy=${encodeURIComponent(order || "")}`);
+    },
+    filter: (filterObj, orderBy = undefined, _limit = undefined) => {
+      void filterObj;
+      const order = orderBy ? String(orderBy) : undefined;
+      return api(`/staff-transfers?orderBy=${encodeURIComponent(order || "")}`);
+    },
+    create: (data) => api("/staff-transfers", { method: "POST", body: data }),
+  };
+
+  return { Expense, SentPayment, Collection, User, Client, CashLedger, StaffTransfer };
 }
 
 const base44 = {
+
   auth: buildAuth(),
   entities: buildEntities(),
   users: {
     createStaff: (payload) =>
       api("/users/create", { method: "POST", body: payload }),
+    updateStaff: (id, payload) =>
+      api(`/users/${id}`, { method: "PATCH", body: payload }),
+    resetStaffPassword: (id, payload) =>
+      api(`/users/${id}/reset-password`, { method: "POST", body: payload }),
+    deleteStaff: (id) => api(`/users/${id}`, { method: "DELETE" }),
+  },
+
+  settings: {
+    getCompanySettings: () => api(`/settings/company`),
+    saveCompanySettings: (payload) =>
+      api(`/settings/company`, { method: "PUT", body: payload }),
   },
 
   integrations: {
     Core: buildUpload(),
   },
 };
+
 
 export default base44;
 export { base44 };

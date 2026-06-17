@@ -19,6 +19,10 @@ import Sent from "@/pages/Sent";
 import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import Staff from "@/pages/Staff";
+import StaffTransfers from "@/pages/StaffTransfers";
+import CompanySettings from "@/pages/CompanySettings";
+
+
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -60,6 +64,10 @@ const AuthenticatedApp = () => {
 
           {isAdmin && <Route path="/reports" element={<Reports />} />}
           {isAdmin && <Route path="/staff" element={<Staff />} />}
+          {isAdmin && <Route path="/staff-transfers" element={<StaffTransfers user={user} />} />}
+          {isAdmin && <Route path="/company-settings" element={<CompanySettings />} />}
+
+
         </Route>
       </Route>
 

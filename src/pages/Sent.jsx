@@ -110,6 +110,38 @@ export default function Sent({ user }) {
     if (!form.amount) return;
     if (isAdmin && !selectedStaffId) return;
 
+    // Balance validation (insufficient funds)
+    const amountNum = parseFloat(form.amount);
+    if (!Number.isFinite(amountNum)) return;
+
+    // Available Balance = Transfers + Collections - Sent - Expenses
+    const staffId = isAdmin ? selectedStaffId : user.id;
+
+    const availableFromTransfers = (await base44.entities.StaffTransfer.filter({ staff_id: staffId }))
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const availableFromCollections = (await base44.entities.Collection.filter({ staff_id: staffId }))
+      .reduce((sum, c) => sum + (c.amount || 0), 0);
+
+    const existingSent = (await base44.entities.SentPayment.filter({ staff_id: staffId }))
+      .reduce((sum, sp) => sum + (sp.amount || 0), 0);
+
+    const existingExpenses = (await base44.entities.Expense.filter({ staff_id: staffId }))
+      .reduce((sum, ex) => sum + (ex.amount || 0), 0);
+
+    const availableBalance = availableFromTransfers + availableFromCollections - existingSent - existingExpenses;
+
+    if (amountNum > availableBalance) {
+      const { toast } = await import("@/components/ui/toast");
+      toast({
+        variant: "destructive",
+        title: "Insufficient Balance",
+        description: `Available Balance: ${formatCurrency(availableBalance)}`,
+      });
+      return;
+    }
+
+
     if (isAdmin && staffList.length > 0) {
       const selected = staffList.find((s) => s.id === selectedStaffId);
       if (!selected?.full_name) return;

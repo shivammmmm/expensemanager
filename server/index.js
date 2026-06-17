@@ -15,7 +15,10 @@ import { parseOrderParam, sortByFieldForArray } from "./mongoUtils.js";
 
 const app = express();
 
-const allowedOrigins = (process.env.CORS_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
@@ -176,7 +179,6 @@ app.post("/api/auth/resend-otp", async (req, res) => {
   // NOTE: OTP is kept in-memory in the old implementation; current route keeps same behavior for UI.
   // If you later want to persist OTP, update schema/model.
   return res.status(403).json({ message: "OTP onboarding disabled" });
-
 });
 
 // Stub password reset so UI doesn't break
@@ -194,6 +196,68 @@ app.post("/api/auth/reset-password", (req, res) =>
 app.get("/api/users", requireAdmin, async (req, res) => {
   const users = await Models.User.find().lean();
   return res.json(users.map(toPublicUser));
+});
+
+function ensureNotAdminTarget(targetUser) {
+  if (targetUser?.role === "admin") {
+    const err = new Error("Operation not allowed on admin account");
+    err.status = 403;
+    throw err;
+  }
+}
+
+// PATCH staff fields (admin only)
+// PUT /api/users/:id
+app.patch("/api/users/:id", requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  const target = await Models.User.findOne({ id: req.params.id });
+  if (!target) return res.status(404).json({ message: "Staff not found" });
+
+  ensureNotAdminTarget(target);
+
+  const allowed = ["full_name", "email", "phone", "designation", "area"];
+
+  for (const k of allowed) {
+    if (Object.prototype.hasOwnProperty.call(body, k)) {
+      const v = body[k];
+      if (k === "email" && v != null) target[k] = String(v).toLowerCase();
+      else target[k] = v == null ? "" : String(v);
+    }
+  }
+
+  await target.save();
+  return res.json(toPublicUser(target.toObject ? target.toObject() : target));
+});
+
+// POST reset password (admin only)
+app.post("/api/users/:id/reset-password", requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  const { password } = body;
+
+  if (!password) {
+    return res.status(400).json({ message: "password is required" });
+  }
+
+  const target = await Models.User.findOne({ id: req.params.id });
+  if (!target) return res.status(404).json({ message: "Staff not found" });
+
+  ensureNotAdminTarget(target);
+
+  target.passwordHash = bcrypt.hashSync(String(password), 10);
+  await target.save();
+
+  return res.json({ message: "Password updated" });
+});
+
+// DELETE staff (admin only)
+app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+  const target = await Models.User.findOne({ id: req.params.id }).lean();
+  if (!target) return res.status(404).json({ message: "Staff not found" });
+
+  ensureNotAdminTarget(target);
+
+  await Models.User.deleteOne({ id: req.params.id });
+  return res.json({ message: "Staff deleted" });
 });
 
 // Create staff (OTP-based onboarding removed)
@@ -272,7 +336,9 @@ app.post("/api/collections", authRequired, async (req, res) => {
   const body = req.body || {};
 
   if (body.source) {
-    const existingClient = await Models.Client.findOne({ name: { $regex: new RegExp(`^${body.source}$`, "i") } }).lean();
+    const existingClient = await Models.Client.findOne({
+      name: { $regex: new RegExp(`^${body.source}$`, "i") },
+    }).lean();
     if (!existingClient) {
       const trimmedName = String(body.source).trim();
       await Models.Client.create({
@@ -412,7 +478,9 @@ app.post("/api/sent-payments", authRequired, async (req, res) => {
   const body = req.body || {};
 
   if (body.sent_to) {
-    const existingClient = await Models.Client.findOne({ name: { $regex: new RegExp(`^${body.sent_to}$`, "i") } }).lean();
+    const existingClient = await Models.Client.findOne({
+      name: { $regex: new RegExp(`^${body.sent_to}$`, "i") },
+    }).lean();
     if (!existingClient) {
       const trimmedName = String(body.sent_to).trim();
       await Models.Client.create({
@@ -440,6 +508,74 @@ app.post("/api/sent-payments", authRequired, async (req, res) => {
   return res.json(item);
 });
 
+// ---- CashLedger ----
+app.get("/api/cash-ledger", requireAdmin, async (req, res) => {
+  const items = await Models.CashLedger.find().lean();
+  const orderBy = req.query.orderBy;
+  const parsed = parseOrderParam(orderBy);
+  const sorted = parsed ? sortByFieldForArray(items, parsed) : items;
+  return res.json(sorted);
+});
+
+app.post("/api/cash-ledger", requireAdmin, async (req, res) => {
+  const u = await Models.User.findOne({ id: req.auth.userId }).lean();
+  const body = req.body || {};
+
+  const item = {
+    id: uuidv4(),
+    amount: Number(body.amount) || 0,
+    remark: body.remark || "",
+    entry_date: body.entry_date || new Date().toISOString().slice(0, 10),
+    created_by: u.id,
+    created_at: new Date().toISOString(),
+  };
+
+  await Models.CashLedger.create(item);
+  return res.json(item);
+});
+
+// ---- StaffTransfer ----
+app.get("/api/staff-transfers", authRequired, async (req, res) => {
+  const u = await Models.User.findOne({ id: req.auth.userId }).lean();
+
+  let items = [];
+  if (u?.role === "admin") {
+    items = await Models.StaffTransfer.find().lean();
+  } else {
+    items = await Models.StaffTransfer.find({ staff_id: u.id }).lean();
+  }
+
+  const orderBy = req.query.orderBy;
+  const parsed = parseOrderParam(orderBy);
+  const sorted = parsed ? sortByFieldForArray(items, parsed) : items;
+  return res.json(sorted);
+});
+
+app.post("/api/staff-transfers", requireAdmin, async (req, res) => {
+  const u = await Models.User.findOne({ id: req.auth.userId }).lean();
+  const body = req.body || {};
+
+  const staffId = body.staff_id;
+  if (!staffId) return res.status(400).json({ message: "staff_id required" });
+
+  const staff = await Models.User.findOne({ id: staffId }).lean();
+  if (!staff) return res.status(404).json({ message: "Staff not found" });
+
+  const item = {
+    id: uuidv4(),
+    staff_id: staff.id,
+    staff_name: staff.full_name || "",
+    amount: Number(body.amount) || 0,
+    remark: body.remark || "",
+    transfer_date: body.transfer_date || new Date().toISOString().slice(0, 10),
+    created_by: u.id,
+    created_at: new Date().toISOString(),
+  };
+
+  await Models.StaffTransfer.create(item);
+  return res.json(item);
+});
+
 // ---- Clients ----
 app.get("/api/clients", authRequired, async (req, res) => {
   const currentUser = await Models.User.findOne({
@@ -461,6 +597,54 @@ app.get("/api/clients", authRequired, async (req, res) => {
   return res.json(items);
 });
 
+// ---- Company Settings (Admin only) ----
+// GET /api/settings/company
+app.get("/api/settings/company", requireAdmin, async (req, res) => {
+  const settings = await Models.Settings.findOne().lean();
+  return res.json(
+    settings || {
+      company_name: "",
+      company_phone: "",
+      company_address: "",
+    }
+  );
+});
+
+// PUT /api/settings/company
+app.put("/api/settings/company", requireAdmin, async (req, res) => {
+  try {
+    console.log("Company Settings Save:", req.body);
+
+    const body = req.body || {};
+
+    // Ensure every path returns a response
+    if (!body) {
+      return res.status(400).json({ error: "Invalid request body" });
+    }
+    const { company_name, company_phone, company_address } = body;
+
+    const updated = await Models.Settings.findOneAndUpdate(
+      {},
+      {
+        company_name: String(company_name || ""),
+        company_phone: String(company_phone || ""),
+        company_address: String(company_address || ""),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        upsert: true,
+        new: true,
+      }
+    );
+
+    return res.json(updated);
+  } catch (err) {
+    return res.status(500).json({
+      error: err?.message || "Internal server error",
+    });
+  }
+});
+
 // ---- Upload file stub ----
 app.post("/api/upload", authRequired, (req, res) => {
   // Frontend expects { file_url }
@@ -471,3 +655,4 @@ app.post("/api/upload", authRequired, (req, res) => {
 app.listen(PORT, () => {
   console.log(`[local-api] listening on http://localhost:${PORT}`);
 });
+

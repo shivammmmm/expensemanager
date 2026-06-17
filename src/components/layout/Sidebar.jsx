@@ -2,8 +2,9 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, ArrowDownLeft, ArrowUpRight, Receipt, FileText, 
-  ChevronLeft, ChevronRight, LogOut, UserCircle, Users
+  ChevronLeft, ChevronRight, LogOut, UserCircle, Users, ArrowRightLeft
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 
@@ -12,9 +13,13 @@ const adminLinks = [
   { to: "/received", icon: ArrowDownLeft, label: "Received" },
   { to: "/sent", icon: ArrowUpRight, label: "Sent" },
   { to: "/expenses", icon: Receipt, label: "Expenses" },
+  { to: "/staff-transfers", icon: ArrowRightLeft, label: "Staff Transfers" },
+  { to: "/company-settings", icon: FileText, label: "Company Settings" },
   { to: "/reports", icon: FileText, label: "Reports" },
   { to: "/staff", icon: Users, label: "Staff" },
 ];
+
+
 
 const staffLinks = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
