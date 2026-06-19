@@ -1,9 +1,13 @@
-- [ ] Implement mobile “More” sheet in src/components/layout/MobileNav.jsx
-  - [ ] Replace last bottom tab (Transfers) with “More”
-  - [ ] Use existing Sheet UI (src/components/ui/sheet.jsx)
-  - [ ] Admin: Staff Transfers, Staff, Reports, Company Settings, Logout
-  - [ ] Staff: Logout only
-  - [ ] Keep existing bottom nav working for Dashboard/Received/Sent/Expenses
-  - [ ] Reuse route paths from src/components/layout/Sidebar.jsx
-- [ ] Run `npm run build` and ensure it passes
+## Dashboard Cash Delete Audit
+
+- [ ] Update `src/pages/Dashboard.jsx`
+  - [ ] Ensure only Delete button exists (remove any Edit UI)
+  - [ ] Wire delete state: `deleteCashId`, `deleteOpen`
+  - [ ] Delete button sets `setDeleteCashId(entry.id)` and `setDeleteOpen(true)`
+  - [ ] Add confirmation dialog (title/message/cancel+delete)
+  - [ ] On confirm: `await base44.entities.CashLedger.delete(deleteCashId)`
+  - [ ] After success: `queryClient.invalidateQueries(["cash-ledger"])`
+  - [ ] Show toast: `Cash entry deleted successfully`
+  - [ ] Close dialog after success
+  - [ ] Do not modify any formulas / calculations
 

@@ -14,16 +14,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter, // <-- Fixed Import
 } from "@/components/ui/dialog";
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { Plus, ArrowRightLeft, Users } from "lucide-react";
 
@@ -44,12 +58,25 @@ export default function StaffTransfers({ user }) {
     enabled: !!user,
   });
 
+  const [deleteTransferId, setDeleteTransferId] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const handleConfirmDeleteTransfer = async () => {
+    if (!deleteTransferId) return;
+
+    await base44.entities.StaffTransfer.delete(deleteTransferId);
+    await queryClient.invalidateQueries({ queryKey: ["staff-transfers"] });
+    await queryClient.invalidateQueries({ queryKey: ["cash-ledger"] });
+
+    toast({ title: "Staff transfer deleted" });
+    setDeleteOpen(false);
+  };
+
   const { data: cashLedger = [] } = useQuery({
     queryKey: ["cash-ledger"],
     queryFn: () => base44.entities.CashLedger.list(),
     enabled: !!user,
   });
-
 
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,13 +100,17 @@ export default function StaffTransfers({ user }) {
 
     const amount = Number(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast({ title: "Invalid amount", description: "Amount must be greater than 0." });
+      toast({
+        title: "Invalid amount",
+        description: "Amount must be greater than 0.",
+      });
       return;
     }
 
     // Transfer validation: if transferAmount > Available Shop Cash => block
-    const shopCash = cashLedger.reduce((sum, l) => sum + (l.amount || 0), 0)
-      - transfers.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const shopCash =
+      cashLedger.reduce((sum, l) => sum + (l.amount || 0), 0) -
+      transfers.reduce((sum, t) => sum + (t.amount || 0), 0);
 
     if (amount > shopCash) {
       toast({
@@ -98,10 +129,11 @@ export default function StaffTransfers({ user }) {
         transfer_date: form.transfer_date,
       });
 
-
       toast({
         title: "Transfer saved",
-        description: `Transferred ${formatCurrency(amount)} to ${selectedStaff?.full_name || "staff"}`,
+        description: `Transferred ${formatCurrency(amount)} to ${
+          selectedStaff?.full_name || "staff"
+        }`,
       });
 
       setCreateOpen(false);
@@ -113,7 +145,7 @@ export default function StaffTransfers({ user }) {
       });
 
       queryClient.invalidateQueries({ queryKey: ["staff-transfers"] });
-    } finally {
+    } finally { // <-- Fixed Typo Here
       setSaving(false);
     }
   };
@@ -122,14 +154,21 @@ export default function StaffTransfers({ user }) {
     return (
       <div className="space-y-6">
         <PageHeader title="Staff Transfers" subtitle="Admin only" />
-        <EmptyState icon={Users} title="Forbidden" description="You do not have access to staff transfers." />
+        <EmptyState
+          icon={Users}
+          title="Forbidden"
+          description="You do not have access to staff transfers."
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Staff Transfers" subtitle="Transfer shop cash to staff balances" >
+      <PageHeader
+        title="Staff Transfers"
+        subtitle="Transfer shop cash to staff balances"
+      >
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           New Transfer
@@ -160,6 +199,7 @@ export default function StaffTransfers({ user }) {
                   <TableHead>Staff</TableHead>
                   <TableHead>Remark</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -167,9 +207,25 @@ export default function StaffTransfers({ user }) {
                   <TableRow key={t.id}>
                     <TableCell>{t.transfer_date}</TableCell>
                     <TableCell>{t.staff_name || t.staff_id}</TableCell>
-                    <TableCell className="max-w-[260px] truncate">{t.remark || ""}</TableCell>
+                    <TableCell className="max-w-[260px] truncate">
+                      {t.remark || ""}
+                    </TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatCurrency(t.amount || 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setDeleteTransferId(t.id);
+                          setDeleteOpen(true);
+                        }}
+                      >
+                        Delete
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -179,10 +235,43 @@ export default function StaffTransfers({ user }) {
         </CardContent>
       </Card>
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Staff Transfer</DialogTitle>
+          </DialogHeader>
+
+          <div className="text-sm text-muted-foreground">
+            Are you sure?
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDeleteTransfer}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-heading">New Staff Transfer</DialogTitle>
+            <DialogTitle className="font-heading">
+              New Staff Transfer
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
@@ -210,7 +299,9 @@ export default function StaffTransfers({ user }) {
               <Input
                 type="number"
                 value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, amount: e.target.value }))
+                }
                 placeholder="0"
               />
             </div>
@@ -220,7 +311,9 @@ export default function StaffTransfers({ user }) {
               <Input
                 type="date"
                 value={form.transfer_date}
-                onChange={(e) => setForm((f) => ({ ...f, transfer_date: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, transfer_date: e.target.value }))
+                }
               />
             </div>
 
@@ -228,7 +321,9 @@ export default function StaffTransfers({ user }) {
               <Label>Remark</Label>
               <Textarea
                 value={form.remark}
-                onChange={(e) => setForm((f) => ({ ...f, remark: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, remark: e.target.value }))
+                }
                 placeholder="Optional remark"
                 rows={3}
               />
@@ -243,11 +338,14 @@ export default function StaffTransfers({ user }) {
               </Button>
             </div>
 
-            {loadingStaff && <div className="text-xs text-muted-foreground">Loading staff...</div>}
+            {loadingStaff && (
+              <div className="text-xs text-muted-foreground">
+                Loading staff...
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
-

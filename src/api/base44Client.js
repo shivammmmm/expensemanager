@@ -195,6 +195,7 @@ function buildEntities() {
       return api(`/cash-ledger?orderBy=${encodeURIComponent(order || "")}`);
     },
     create: (data) => api("/cash-ledger", { method: "POST", body: data }),
+    delete: (id) => api(`/cash-ledger/${id}`, { method: "DELETE" }),
   };
 
   const StaffTransfer = {
@@ -208,6 +209,7 @@ function buildEntities() {
       return api(`/staff-transfers?orderBy=${encodeURIComponent(order || "")}`);
     },
     create: (data) => api("/staff-transfers", { method: "POST", body: data }),
+    delete: (id) => api(`/staff-transfers/${id}`, { method: "DELETE" }),
   };
 
   return { Expense, SentPayment, Collection, User, Client, CashLedger, StaffTransfer };

@@ -534,6 +534,11 @@ app.post("/api/cash-ledger", requireAdmin, async (req, res) => {
   return res.json(item);
 });
 
+app.delete("/api/cash-ledger/:id", requireAdmin, async (req, res) => {
+  await Models.CashLedger.deleteOne({ id: req.params.id });
+  return res.json({ message: "Cash entry deleted" });
+});
+
 // ---- StaffTransfer ----
 app.get("/api/staff-transfers", authRequired, async (req, res) => {
   const u = await Models.User.findOne({ id: req.auth.userId }).lean();
@@ -574,6 +579,11 @@ app.post("/api/staff-transfers", requireAdmin, async (req, res) => {
 
   await Models.StaffTransfer.create(item);
   return res.json(item);
+});
+
+app.delete("/api/staff-transfers/:id", requireAdmin, async (req, res) => {
+  await Models.StaffTransfer.deleteOne({ id: req.params.id });
+  return res.json({ message: "Staff transfer deleted" });
 });
 
 // ---- Clients ----
